@@ -12,10 +12,11 @@
 #include <utility>
 #include <cstring>
 #include <cstdlib>
-#include <cstdio>   
+#include <cstdio>
+#include <functional>
 
-
-enum TokenType{
+// Tokenizer
+enum TokenType {
     NONE,
     NUMBER,
     STRING,
@@ -24,99 +25,88 @@ enum TokenType{
     KEYWORD,
     PUNCTUATION,
     COMMENT,
-    WHITESPACE
-    };
+    WHITESPACE,
+    OPEN_PAREN,
+    CLOSE_PAREN
+};
 
-struct Token{
+struct Token {
     std::string value;
     TokenType type;
 };
 
-Token token(const std::string& val, TokenType type) {
-    return Token{val, type};
-}
-
 std::string shift(std::vector<std::string>& src) {
-    std::string val = src.front();
+    std::string front = src.front();
     src.erase(src.begin());
-    return val;
+    return front;
 }
 
-std::vector<Token> tokenize(std::string &sourceCode) {
+bool isNumber(const std::string& s) {
+    return std::regex_match(s, std::regex("^-?\\d+$"));
+}
+
+bool isString(const std::string& s) {
+    return s.size() >= 2 && s.front() == '"' && s.back() == '"';
+}
+
+bool isIdentifier(const std::string& s) {
+    return std::regex_match(s, std::regex("^[a-zA-Z_+\\-*/><=!?][a-zA-Z0-9_+\\-*/><=!?]*$"));
+}
+
+bool isSkippable(char ch) {
+    return std::isspace(ch);
+}
+
+Token token(const std::string& val, TokenType t) {
+    return Token{val, t};
+}
+
+std::vector<std::string> splitString(const std::string& sourceCode) {
+    std::vector<std::string> tokens;
+    std::string current;
+    for (char ch : sourceCode) {
+        if (std::isspace(ch)) {
+            if (!current.empty()) {
+                tokens.push_back(current);
+                current.clear();
+            }
+        } else if (ch == '(' || ch == ')') {
+            if (!current.empty()) {
+                tokens.push_back(current);
+                current.clear();
+            }
+            tokens.push_back(std::string(1, ch));
+        } else {
+            current += ch;
+        }
+    }
+    if (!current.empty()) tokens.push_back(current);
+    return tokens;
+}
+
+std::vector<Token> tokenize(std::string& sourceCode) {
     std::vector<Token> tokens;
     std::vector<std::string> src = splitString(sourceCode);
 
     while (!src.empty()) {
-        if (src.front() == "(") {
-            tokens.push_back(token(shift(src), TokenType::OpenParen));
-        }
-        else if (src.front() == ")") {
-            tokens.push_back(token(shift(src), TokenType::CloseParen));
-        }
-        else if (isNumber(src.front())) {
-            std::string number;
-            while (!src.empty() && isNumber(src.front())) {
-                number += shift(src);
-            }
-            tokens.push_back(token(number, TokenType::Number));
-        }
-        else if (isString(src.front())) {
-            std::string str;
-            while (!src.empty() && isString(src.front())) {
-                str += shift(src);
-            }
-            tokens.push_back(token(str, TokenType::String));
-        }
-        else if (isIdentidfier(src.front())) {
-            std::string ident = shift(src);
-            while (!src.empty() && isIdentidfier(src.front())) {
-                ident += shift(src);
-            }
-            tokens.push_back(token(ident, TokenType::Identifier));
-        }
-        else if (isOperator(src.front())) {
-            tokens.push_back(token(shift(src), TokenType::Operator));
-        }
-        else if (isKeyword(src.front())) {
-            tokens.push_back(token(shift(src), TokenType::Keyword));
-        }
-        else if (isPunctuation(src.front())) {
-            tokens.push_back(token(shift(src), TokenType::Punctuation));
-        }
-        else if (isComment(src.front())) {
-            std::string comment;
-            while (!src.empty() && isComment(src.front())) {
-                comment += shift(src);
-            }
-            tokens.push_back(token(comment, TokenType::Comment));
-        }
-        else if (isWhitespace(src.front()[0])) {
+        std::string current = src.front();
+
+        if (current == "(") {
+            tokens.push_back(token(shift(src), OPEN_PAREN));
+        } else if (current == ")") {
+            tokens.push_back(token(shift(src), CLOSE_PAREN));
+        } else if (isNumber(current)) {
+            tokens.push_back(token(shift(src), NUMBER));
+        } else if (isString(current)) {
+            tokens.push_back(token(shift(src), STRING));
+        } else if (isIdentifier(current)) {
+            tokens.push_back(token(shift(src), IDENTIFIER));
+        } else if (isSkippable(current[0])) {
             shift(src);
-        }
         } else {
-            throw std::runtime_error("Unknown token: " + src.front());
+            throw std::runtime_error("Unknown token: " + current);
         }
     }
 
     return tokens;
-}
-
-std::vector<std::string> splitString(const std::string &sourceCode) {
-    std::vector<std::string> words;
-    std::string word;
-
-    for (char ch : sourceCode) {
-        if (ch != ' ') {
-            word += ch;
-        } else if (!word.empty()) {
-            words.push_back(word);
-            word.clear();
-        }
-    }
-
-    if (!word.empty()) {
-        words.push_back(word);
-    }
-
-    return words;
 }

@@ -1,30 +1,28 @@
 int main() {
-    // Example Lisp program: ((lambda (x) (+ x 1)) 5)
-    std::string program = "((lambda (x) (+ x 1)) 5)";
+    std::string program = "((define x 5) (+ x 3))";
 
-    // Tokenize → Parse → Evaluate
-    auto tokens = tokenize(program);
-    auto ast = parse(tokens);
-
-    // Set up global environment with built-in functions
-    Env env;
-    env["+"] = [](std::vector<Value> args) { return to_int(args[0]) + to_int(args[1]); };
-    env["-"] = [](std::vector<Value> args) { return to_int(args[0]) - to_int(args[1]); };
-    env["*"] = [](std::vector<Value> args) { return to_int(args[0]) * to_int(args[1]); };
-    env["/"] = [](std::vector<Value> args) { return to_int(args[0]) / to_int(args[1]); };
-    env[">"] = [](std::vector<Value> args) { return to_int(args[0]) > to_int(args[1]) ? 1 : 0; };
-
-    // Evaluate and print result
     try {
-        Value result = eval(ast, env);
-        if (std::holds_alternative<int>(result))
-            std::cout << "Result: " << std::get<int>(result) << "\n";
-        else if (std::holds_alternative<std::string>(result))
-            std::cout << "Result: " << std::get<std::string>(result) << "\n";
-        else
-            std::cout << "Result: <function>\n";
+        auto tokens = tokenize(program);
+        for (const auto& token : tokens) {
+            std::cout << "Token: " << token.value << "\n";
+        }
+        std::cout << "Parsing..." << std::endl;
+        auto ast = parse(tokens);
+        std::cout << "Parsed successfully." << std::endl;
+        std::cout << "Evaluating...\n";
+
+
+        Env env;
+        env["x"] = [](std::vector<int> args) { return args[0]; };
+        env["+"] = [](std::vector<int> args) { return args[0] + args[1]; };
+        env["-"] = [](std::vector<int> args) { return args[0] - args[1]; };
+        env["*"] = [](std::vector<int> args) { return args[0] * args[1]; };
+        env["/"] = [](std::vector<int> args) { return args[0] / args[1]; };
+
+        int result = eval(ast, env);
+        std::cout << "Result: " << result << "\n";
     } catch (const std::exception& e) {
-        std::cerr << "Execution Error: " << e.what() << "\n";
+        std::cerr << "Error: " << e.what() << "\n";
         return 1;
     }
 
