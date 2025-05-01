@@ -32,6 +32,15 @@ struct Token{
     TokenType type;
 };
 
+Token token(const std::string& val, TokenType type) {
+    return Token{val, type};
+}
+
+std::string shift(std::vector<std::string>& src) {
+    std::string val = src.front();
+    src.erase(src.begin());
+    return val;
+}
 
 std::vector<Token> tokenize(std::string &sourceCode) {
     std::vector<Token> tokens;
@@ -81,7 +90,7 @@ std::vector<Token> tokenize(std::string &sourceCode) {
             }
             tokens.push_back(token(comment, TokenType::Comment));
         }
-        else if (isSkippable(src.front()[0])) {
+        else if (isWhitespace(src.front()[0])) {
             shift(src);
         }
         } else {
