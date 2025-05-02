@@ -93,9 +93,9 @@ std::vector<std::string> splitString(const std::string& sourceCode) {
     return tokens;
 }
 
-std::vector<Token> tokenize(std::string& sourceCode) {
+std::vector<Token> tokenize(const std::string& sourceCode) {
     std::vector<Token> tokens;
-    std::vector<std::string> src = splitString(sourceCode);
+    std::vector<std::string> src = splitString(sourceCode); // splitString already works with const std::string&
 
     while (!src.empty()) {
         std::string current = src.front();
@@ -169,102 +169,115 @@ typedef std::map<std::string, ValueFunc> Env;
 
 int eval(ExprPtr expr, Env& env);
 
-int to_int(const std::string& v) {
-    try {
-        return std::stoi(v);
-    } catch (...) {
-        throw std::runtime_error("Invalid number: " + v);
-    }
-}
-
-void printList(const std::vector<ExprPtr>& list) {
-    std::cout << "Evaluating list: (";
-    for (size_t i = 0; i < list.size(); ++i) {
-        Atom* atom = dynamic_cast<Atom*>(list[i]);
-        if (atom) std::cout << atom->value << " ";
-        else std::cout << "(...) ";
-    }
-    std::cout << ")" << std::endl;
-}
-
 int eval_list(const std::vector<ExprPtr>& list, Env& env) {
     if (list.empty()) throw std::runtime_error("Empty list");
-
-    printList(list);
 
     Atom* head = dynamic_cast<Atom*>(list[0]);
     if (!head) throw std::runtime_error("Expected function name");
 
     std::string sym = head->value;
+    std::cout << "[eval_list] Function: " << sym << "\n";
 
     if (sym == "define") {
         Atom* name = dynamic_cast<Atom*>(list[1]);
         int val = eval(list[2], env);
         env[name->value] = [val](std::vector<int>) { return val; };
-        std::cout << "Defined " << name->value << " = " << val << std::endl;
+        std::cout << "[define] " << name->value << " = " << val << "\n";
         return val;
     } else if (sym == "if") {
         int cond = eval(list[1], env);
         return cond ? eval(list[2], env) : eval(list[3], env);
+    } else if (sym == "quote") {
+        std::cout << "[quote] Returning raw expression\n";
+        if (Atom* atom = dynamic_cast<Atom*>(list[1])) {
+            std::cout << "[quote] Atom: " << atom->value << "\n";
+            return 0; // or return placeholder value
+        } else if (List* quotedList = dynamic_cast<List*>(list[1])) {
+            std::cout << "[quote] List: (";
+            for (auto& item : quotedList->elements) {
+                if (Atom* a = dynamic_cast<Atom*>(item)) {
+                    std::cout << a->value << " ";
+                } else {
+                    std::cout << "<expr> ";
+                }
+            }
+            std::cout << ")\n";
+            return 0; // no evaluation, just acknowledgment
+        } else {
+            throw std::runtime_error("Unsupported quote content");
+        }
     }
 
-    if (!env.count(sym)) throw std::runtime_error("Undefined function: " + sym);
+    if (!env.count(sym)) {
+        throw std::runtime_error("Undefined function: " + sym);
+    }
 
     ValueFunc func = env[sym];
     std::vector<int> args;
     for (size_t i = 1; i < list.size(); ++i)
         args.push_back(eval(list[i], env));
 
-    std::cout << "Calling function " << sym << " with arguments: ";
-    for (int a : args) std::cout << a << " ";
-    std::cout << std::endl;
+    std::cout << "[call] " << sym << " with args:";
+    for (int a : args) std::cout << " " << a;
+    std::cout << "\n";
 
     return func(args);
 }
 
 int eval(ExprPtr expr, Env& env) {
     if (Atom* a = dynamic_cast<Atom*>(expr)) {
-        if (isNumber(a->value)) {
-            int val = to_int(a->value);
-            std::cout << "Evaluating atom (number): " << val << std::endl;
-            return val;
+        std::cout << "[eval atom] " << a->value << "\n";
+        if (std::regex_match(a->value, std::regex("^-?\\d+$"))) {
+            return std::stoi(a->value);
         }
         if (env.count(a->value)) {
-            std::cout << "Evaluating atom (variable): " << a->value << std::endl;
             return env[a->value]({});
         }
-        throw std::runtime_error("Undefined symbol: " + a->value);
+        throw std::runtime_error("Undefined variable or symbol: " + a->value);
     } else if (List* l = dynamic_cast<List*>(expr)) {
+        std::cout << "[eval list]\n";
         return eval_list(l->elements, env);
     }
-    throw std::runtime_error("Unknown expression");
+    throw std::runtime_error("Unknown expression type");
 }
 
 // Main
 int main() {
-    std::string program = "(define x 5)";
-    std::string program2 = "(+ x 3)";
+    std::vector<std::string> programs = {
+        "(define x 5)",
+        "(+ x 3)",
+        "(quote (1 2 3))",
+        "(if (> x 3) (+ x 2) (- x 2))",
+        "(define square (lambda (x) (* x x)))",  // not yet supported
+        "(square 4)"                             // not yet supported
+    };
 
     Env env;
     env["+"] = [](std::vector<int> args) { return args[0] + args[1]; };
     env["-"] = [](std::vector<int> args) { return args[0] - args[1]; };
     env["*"] = [](std::vector<int> args) { return args[0] * args[1]; };
     env["/"] = [](std::vector<int> args) { return args[0] / args[1]; };
+    env[">"] = [](std::vector<int> args) { return args[0] > args[1]; };
+    env["square"] = [](std::vector<int> args) { return args[0] * args[0]; };
 
     try {
-        std::vector<std::string> rawTokens1 = splitString(program);
-        std::vector<std::string> rawTokens2 = splitString(program2);
+        for (size_t i = 0; i < programs.size(); ++i) {
+            const std::string& program = programs[i];
+            std::cout << "==============================\n";
+            std::cout << "Program " << (i + 1) << ": " << program << "\n";
 
-        std::vector<Token> tokens1 = tokenize(program);
-        std::vector<Token> tokens2 = tokenize(program2);
+            std::vector<Token> tokens = tokenize(program);
+            std::cout << "Tokens: ";
+            for (const auto& t : tokens)
+                std::cout << t.value << " ";
+            std::cout << "\n";
 
-        ExprPtr ast1 = parse(tokens1);
-        ExprPtr ast2 = parse(tokens2);
-
-        eval(ast1, env);  // define x
-        int result = eval(ast2, env);  // (+ x 3)
-
-        std::cout << "Result: " << result << std::endl;
+            ExprPtr ast = parse(tokens);
+            std::cout << "Evaluating...\n";
+            int result = eval(ast, env);
+            std::cout << "Result: " << result << "\n";
+            std::cout << std::endl;
+        }
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
     }
