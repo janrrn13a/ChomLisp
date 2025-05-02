@@ -248,8 +248,7 @@ int main() {
         "(+ x 3)",
         "(quote (1 2 3))",
         "(if (> x 3) (+ x 2) (- x 2))",
-        "(define square (lambda (x) (* x x)))",  // not yet supported
-        "(square 4)"                             // not yet supported
+        "(square 4)"                             
     };
 
     Env env;
