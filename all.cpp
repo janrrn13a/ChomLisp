@@ -2,18 +2,11 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <list>
 #include <map>
-#include <regex>
-#include <algorithm>
-#include <cctype>
-#include <iterator>
 #include <stdexcept>
-#include <utility>
-#include <cstring>
-#include <cstdlib>
-#include <cstdio>
+#include <memory>
 #include <functional>
+#include <regex>
 
 // Tokenizer
 enum TokenType {
@@ -152,20 +145,31 @@ ExprPtr parse(std::vector<Token>& tokens) {
 // Evaluator
 typedef std::function<int(std::vector<int>)> ValueFunc;
 typedef std::map<std::string, ValueFunc> Env;
+
 int eval(ExprPtr expr, Env& env);
 
 int to_int(const std::string& v) {
     try {
         return std::stoi(v);
-    } catch (const std::invalid_argument&) {
-        throw std::runtime_error("Invalid number format: " + v);
-    } catch (const std::out_of_range&) {
-        throw std::runtime_error("Number out of range: " + v);
+    } catch (...) {
+        throw std::runtime_error("Invalid number: " + v);
     }
+}
+
+void printList(const std::vector<ExprPtr>& list) {
+    std::cout << "Evaluating list: (";
+    for (size_t i = 0; i < list.size(); ++i) {
+        Atom* atom = dynamic_cast<Atom*>(list[i]);
+        if (atom) std::cout << atom->value << " ";
+        else std::cout << "(...) ";
+    }
+    std::cout << ")" << std::endl;
 }
 
 int eval_list(const std::vector<ExprPtr>& list, Env& env) {
     if (list.empty()) throw std::runtime_error("Empty list");
+
+    printList(list);
 
     Atom* head = dynamic_cast<Atom*>(list[0]);
     if (!head) throw std::runtime_error("Expected function name");
@@ -175,28 +179,38 @@ int eval_list(const std::vector<ExprPtr>& list, Env& env) {
     if (sym == "define") {
         Atom* name = dynamic_cast<Atom*>(list[1]);
         int val = eval(list[2], env);
-        env[name->value] = [val](std::vector<int>) { return val; }; // wrap int in function
+        env[name->value] = [val](std::vector<int>) { return val; };
+        std::cout << "Defined " << name->value << " = " << val << std::endl;
         return val;
     } else if (sym == "if") {
         int cond = eval(list[1], env);
         return cond ? eval(list[2], env) : eval(list[3], env);
     }
 
-    if (!env.count(sym)) throw std::runtime_error("Unknown function: " + sym);
+    if (!env.count(sym)) throw std::runtime_error("Undefined function: " + sym);
+
     ValueFunc func = env[sym];
     std::vector<int> args;
     for (size_t i = 1; i < list.size(); ++i)
         args.push_back(eval(list[i], env));
+
+    std::cout << "Calling function " << sym << " with arguments: ";
+    for (int a : args) std::cout << a << " ";
+    std::cout << std::endl;
+
     return func(args);
 }
 
 int eval(ExprPtr expr, Env& env) {
     if (Atom* a = dynamic_cast<Atom*>(expr)) {
         if (isNumber(a->value)) {
-            return to_int(a->value);
+            int val = to_int(a->value);
+            std::cout << "Evaluating atom (number): " << val << std::endl;
+            return val;
         }
         if (env.count(a->value)) {
-            return env[a->value]({}); // call stored function with no args
+            std::cout << "Evaluating atom (variable): " << a->value << std::endl;
+            return env[a->value]({});
         }
         throw std::runtime_error("Undefined symbol: " + a->value);
     } else if (List* l = dynamic_cast<List*>(expr)) {
@@ -204,33 +218,31 @@ int eval(ExprPtr expr, Env& env) {
     }
     throw std::runtime_error("Unknown expression");
 }
+
 // Main
 int main() {
-    std::string program = "((define x 5) (+ x 3))";
+    std::string program = "(define x 5)";
+    std::string program2 = "(+ x 3)";
+
+    Env env;
+    env["+"] = [](std::vector<int> args) { return args[0] + args[1]; };
+    env["-"] = [](std::vector<int> args) { return args[0] - args[1]; };
+    env["*"] = [](std::vector<int> args) { return args[0] * args[1]; };
+    env["/"] = [](std::vector<int> args) { return args[0] / args[1]; };
 
     try {
-        auto tokens = tokenize(program);
-        for (const auto& token : tokens) {
-            std::cout << "Token: " << token.value << "\n";
-        }
-        std::cout << "Parsing..." << std::endl;
-        auto ast = parse(tokens);
-        std::cout << "Parsed successfully." << std::endl;
-        std::cout << "Evaluating...\n";
+        std::vector<std::string> tokens1 = splitString(program);
+        std::vector<std::string> tokens2 = splitString(program2);
 
+        ExprPtr ast1 = parse(tokens1);
+        ExprPtr ast2 = parse(tokens2);
 
-        Env env;
-        env["x"] = [](std::vector<int> args) { return args[0]; };
-        env["+"] = [](std::vector<int> args) { return args[0] + args[1]; };
-        env["-"] = [](std::vector<int> args) { return args[0] - args[1]; };
-        env["*"] = [](std::vector<int> args) { return args[0] * args[1]; };
-        env["/"] = [](std::vector<int> args) { return args[0] / args[1]; };
+        eval(ast1, env);  // define x
+        int result = eval(ast2, env);  // (+ x 3)
 
-        int result = eval(ast, env);
-        std::cout << "Result: " << result << "\n";
+        std::cout << "Result: " << result << std::endl;
     } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << "\n";
-        return 1;
+        std::cerr << "Error: " << e.what() << std::endl;
     }
 
     return 0;
