@@ -28,6 +28,22 @@ struct Token {
     TokenType type;
 };
 
+std::string tokenTypeToString(TokenType t) {
+    switch (t) {
+        case NUMBER: return "NUMBER";
+        case STRING: return "STRING";
+        case IDENTIFIER: return "IDENTIFIER";
+        case OPERATOR: return "OPERATOR";
+        case KEYWORD: return "KEYWORD";
+        case PUNCTUATION: return "PUNCTUATION";
+        case COMMENT: return "COMMENT";
+        case WHITESPACE: return "WHITESPACE";
+        case OPEN_PAREN: return "OPEN_PAREN";
+        case CLOSE_PAREN: return "CLOSE_PAREN";
+        default: return "UNKNOWN";
+    }
+}
+
 std::string shift(std::vector<std::string>& src) {
     std::string front = src.front();
     src.erase(src.begin());
@@ -43,7 +59,7 @@ bool isString(const std::string& s) {
 }
 
 bool isIdentifier(const std::string& s) {
-    return std::regex_match(s, std::regex("^[a-zA-Z_+\\-*/><=!?][a-zA-Z0-9_+\\-*/><=!?]*$"));
+    return std::regex_match(s, std::regex("^[a-zA-Z_+\\-\\*/><=!?][a-zA-Z0-9_+\\-\\*/><=!?]*$"));
 }
 
 bool isSkippable(char ch) {
@@ -101,8 +117,13 @@ std::vector<Token> tokenize(std::string& sourceCode) {
         }
     }
 
+    for (const auto& t : tokens) {
+        std::cout << "Token: " << t.value << " (" << tokenTypeToString(t.type) << ")\n";
+    }
+
     return tokens;
 }
+
 
 // Parser
 struct Expr {
@@ -231,8 +252,11 @@ int main() {
     env["/"] = [](std::vector<int> args) { return args[0] / args[1]; };
 
     try {
-        std::vector<std::string> tokens1 = splitString(program);
-        std::vector<std::string> tokens2 = splitString(program2);
+        std::vector<std::string> rawTokens1 = splitString(program);
+        std::vector<std::string> rawTokens2 = splitString(program2);
+
+        std::vector<Token> tokens1 = tokenize(program);
+        std::vector<Token> tokens2 = tokenize(program2);
 
         ExprPtr ast1 = parse(tokens1);
         ExprPtr ast2 = parse(tokens2);
