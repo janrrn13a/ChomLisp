@@ -2,18 +2,11 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <list>
 #include <map>
-#include <regex>
-#include <algorithm>
-#include <cctype>
-#include <iterator>
 #include <stdexcept>
-#include <utility>
-#include <cstring>
-#include <cstdlib>
-#include <cstdio>
+#include <memory>
 #include <functional>
+#include <regex>
 
 // Tokenizer
 enum TokenType {
@@ -35,6 +28,22 @@ struct Token {
     TokenType type;
 };
 
+std::string tokenTypeToString(TokenType t) {
+    switch (t) {
+        case NUMBER: return "NUMBER";
+        case STRING: return "STRING";
+        case IDENTIFIER: return "IDENTIFIER";
+        case OPERATOR: return "OPERATOR";
+        case KEYWORD: return "KEYWORD";
+        case PUNCTUATION: return "PUNCTUATION";
+        case COMMENT: return "COMMENT";
+        case WHITESPACE: return "WHITESPACE";
+        case OPEN_PAREN: return "OPEN_PAREN";
+        case CLOSE_PAREN: return "CLOSE_PAREN";
+        default: return "UNKNOWN";
+    }
+}
+
 std::string shift(std::vector<std::string>& src) {
     std::string front = src.front();
     src.erase(src.begin());
@@ -50,7 +59,7 @@ bool isString(const std::string& s) {
 }
 
 bool isIdentifier(const std::string& s) {
-    return std::regex_match(s, std::regex("^[a-zA-Z_+\\-*/><=!?][a-zA-Z0-9_+\\-*/><=!?]*$"));
+    return std::regex_match(s, std::regex("^[a-zA-Z_+\\-\\*/><=!?][a-zA-Z0-9_+\\-\\*/><=!?]*$"));
 }
 
 bool isSkippable(char ch) {
@@ -84,9 +93,9 @@ std::vector<std::string> splitString(const std::string& sourceCode) {
     return tokens;
 }
 
-std::vector<Token> tokenize(std::string& sourceCode) {
+std::vector<Token> tokenize(const std::string& sourceCode) {
     std::vector<Token> tokens;
-    std::vector<std::string> src = splitString(sourceCode);
+    std::vector<std::string> src = splitString(sourceCode); 
 
     while (!src.empty()) {
         std::string current = src.front();
@@ -106,6 +115,10 @@ std::vector<Token> tokenize(std::string& sourceCode) {
         } else {
             throw std::runtime_error("Unknown token: " + current);
         }
+    }
+
+    for (const auto& t : tokens) {
+        std::cout << "Token: " << t.value << " (" << tokenTypeToString(t.type) << ")\n";
     }
 
     return tokens;
