@@ -95,7 +95,7 @@ std::vector<std::string> splitString(const std::string& sourceCode) {
 
 std::vector<Token> tokenize(const std::string& sourceCode) {
     std::vector<Token> tokens;
-    std::vector<std::string> src = splitString(sourceCode); // splitString already works with const std::string&
+    std::vector<std::string> src = splitString(sourceCode); 
 
     while (!src.empty()) {
         std::string current = src.front();
